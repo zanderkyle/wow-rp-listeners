@@ -10,19 +10,19 @@ local CHANCE = 30               -- Percentage chance (1-100) per kill/action
 local COOLDOWN = 25             -- Minimum seconds between any two Juju RP lines
 -- ==========================================
 
-local charPrefix = nil
-local isEnabled = false
-
 local function ResolveCharacterPrefix(name)
     if not name then return nil end
     if CHARACTER_PREFIXES[name] then
         return CHARACTER_PREFIXES[name]
     end
-    if string.find(name, "^Juju Shab") then
+    if string.find(name, "^Juju") then
         return "ju"
     end
     return nil
 end
+
+local charPrefix = ResolveCharacterPrefix(UnitName("player"))
+local isEnabled = (charPrefix ~= nil and charPrefix ~= "")
 
 local savedAmmo = 0
 local lowAmmoWarned = false
@@ -155,6 +155,7 @@ end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_LOGIN")
+f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("PLAYER_TARGET_CHANGED")
 f:RegisterEvent("LOOT_CLOSED")
 f:RegisterEvent("UNIT_SPELLCAST_START")
@@ -165,17 +166,13 @@ f:RegisterEvent("BAG_UPDATE")
 f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_LOGIN" then
+        if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
         local name = UnitName("player")
         charPrefix = ResolveCharacterPrefix(name)
         isEnabled = (charPrefix ~= nil and charPrefix ~= "")
-        if isEnabled then
-            print("|cff00ff00[JujuRP]|r Active for " .. tostring(name) .. " (prefix: " .. charPrefix .. ")")
-        else
-            print("|cffff5555[JujuRP]|r Inactive for " .. tostring(name))
-        end
         return
     end
+
 
     if not isEnabled then return end
 
