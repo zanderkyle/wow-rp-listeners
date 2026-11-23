@@ -3,6 +3,7 @@
 -- ==========================================
 -- Map each character name to a 2-letter prefix (characters not listed won't run)
 local CHARACTER_PREFIXES = {
+    ["Juju"] = "ju",
     -- ["AltCharacterName"] = "al",
 }
 
@@ -11,12 +12,12 @@ local COOLDOWN = 25             -- Minimum seconds between any two Juju RP lines
 -- ==========================================
 
 local function ResolveCharacterPrefix(name)
-    if not name then return nil end
-    if CHARACTER_PREFIXES[name] then
-        return CHARACTER_PREFIXES[name]
-    end
-    if string.find(name, "^Juju") then
-        return "ju"
+    if not name or name == "" or name == "Unknown" then return nil end
+    local lowerName = string.lower(name)
+    for charName, prefix in pairs(CHARACTER_PREFIXES) do
+        if string.lower(charName) == lowerName then
+            return prefix
+        end
     end
     return nil
 end
