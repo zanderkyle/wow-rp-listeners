@@ -3,7 +3,6 @@
 -- ==========================================
 -- Map each character name to a 2-letter prefix (characters not listed won't run)
 local CHARACTER_PREFIXES = {
-    ["Juju Shabàdu"] = "ju",
     -- ["AltCharacterName"] = "al",
 }
 
@@ -14,7 +13,6 @@ local COOLDOWN = 25             -- Minimum seconds between any two Juju RP lines
 local charPrefix = nil
 local isEnabled = false
 
--- Matches exact name OR starts with "Juju Shab" (avoids UTF-8 accent encoding issues)
 local function ResolveCharacterPrefix(name)
     if not name then return nil end
     if CHARACTER_PREFIXES[name] then
@@ -68,7 +66,6 @@ local function IsDemonicName(rawName)
         or string.find(name, "hellhound")
 end
 
--- Helper to find a scene by slug in SpeakEasyDB
 local function FindSceneBySlug(targetSlug)
     for _, scene in pairs(SpeakEasyDB.scenes) do
         if scene.id == targetSlug or string.lower(scene.name or "") == targetSlug then
@@ -78,11 +75,9 @@ local function FindSceneBySlug(targetSlug)
     return nil
 end
 
--- Reads directly from SpeakEasyDB, replaces {targetName} safely, and avoids repeating the last line
 local function PlaySceneFromSpeakEasyDB(slug, cachedName)
     if not (SpeakEasyDB and SpeakEasyDB.scenes) then return end
 
-    -- Look for prefixed scene first (e.g., "juskinsay"), fall back to unprefixed ("skinsay")
     local prefixedSlug = string.lower(charPrefix) .. slug
     local targetScene = FindSceneBySlug(prefixedSlug) or FindSceneBySlug(slug)
 
@@ -102,7 +97,6 @@ local function PlaySceneFromSpeakEasyDB(slug, cachedName)
 
     if #validLines == 0 then return end
 
-    -- Pick a random line, and if there is more than 1 line, guarantee it is not the exact one used last time
     local idx = TrueRandom(#validLines)
     local chosen = validLines[idx]
     if #validLines > 1 and chosen.text == lastLineText[slug] then
@@ -112,8 +106,6 @@ local function PlaySceneFromSpeakEasyDB(slug, cachedName)
     lastLineText[slug] = chosen.text
 
     local finalText = chosen.text
-
-    -- Resolve {targetName} using live target first, then cached mob name, then fallback
     local mobName = UnitName("target") or cachedName or "dat beast"
     finalText = string.gsub(finalText, "{targetName}", mobName)
     finalText = string.gsub(finalText, "{playerName}", UnitName("player") or "Juju")
@@ -152,7 +144,6 @@ local function FlushPending()
     end
 end
 
--- Fires queued scenes on your next keypress or loot-close click
 local keyFrame = CreateFrame("Frame", "JujuRPKeyFrame", UIParent)
 keyFrame:EnableKeyboard(true)
 keyFrame:SetPropagateKeyboardInput(true)
@@ -194,7 +185,6 @@ f:SetScript("OnEvent", function(self, event, ...)
             lastTargetName = UnitName("target")
         end
 
-    -- 50/50 coin flip between SkinSay and SkinEmote when you start skinning
     elseif event == "UNIT_SPELLCAST_START" then
         local unitTarget, _, spellID = ...
         if unitTarget == "player" and spellID then
@@ -206,7 +196,6 @@ f:SetScript("OnEvent", function(self, event, ...)
             end
         end
 
-    -- Triggers NoSkin only if the beast cannot be skinned
     elseif event == "LOOT_CLOSED" then
         local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
         local mobName = (UnitExists("target") and UnitName("target")) or lastTargetName
@@ -217,7 +206,6 @@ f:SetScript("OnEvent", function(self, event, ...)
             lastTargetType = nil
         end
 
-    -- All other creature types after combat ends
     elseif event == "PLAYER_REGEN_ENABLED" then
         local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
         local rawName = (UnitExists("target") and UnitName("target")) or lastTargetName or ""
@@ -232,17 +220,43 @@ f:SetScript("OnEvent", function(self, event, ...)
                 QueueScene("Mech", rawName)
             elseif cType == "Elemental" then
                 local name = string.lower(rawName)
-                if string.find(name, "earth") or string.find(name, "rock") or string.find(name, "stone") or string.find(name, "crag") or string.find(name, "rumbler") or string.find(name, "boulder") then QueueScene("Earth", rawName)
-                elseif string.find(name, "water") or string.find(name, "tide") or string.find(name, "surf") or string.find(name, "stream") or string.find(name, "wave") or string.find(name, "sea") then QueueScene("Water", rawName)
-                elseif string.find(name, "fire") or string.find(name, "flame") or string.find(name, "ember") or string.find(name, "scorch") or string.find(name, "blaze") or string.find(name, "magma") or string.find(name, "lava") then QueueScene("Fire", rawName)
-                elseif string.find(name, "air") or string.find(name, "wind") or string.find(name, "dust") or string.find(name, "gale") or string.find(name, "cyclone") or string.find(name, "tempest") or string.find(name, "whirlwind") then QueueScene("Air", rawName)
-                else QueueScene("Elem", rawName) end
+                if string.find(name, "earth") or string.find(name, "rock") or string.find(name, "stone") or string.find(name, "crag") or string.find(name, "rumbler") or string.find(name, "boulder") then
+                    QueueScene("Earth", rawName)
+                elseif string.find(name, "water") or string.find(name, "tide") or string.find(name, "surf") or string.find(name, "stream") or string.find(name, "wave") or string.find(name, "sea") then
+                    QueueScene("Water", rawName)
+                elseif string.find(name, "fire") or string.find(name, "flame") or string.find(name, "ember") or string.find(name, "scorch") or string.find(name, "blaze") or string.find(name, "magma") or string.find(name, "lava") then
+                    QueueScene("Fire", rawName)
+                elseif string.find(name, "air") or string.find(name, "wind") or string.find(name, "dust") or string.find(name, "gale") or string.find(name, "cyclone") or string.find(name, "tempest") or string.find(name, "whirlwind") then
+                    QueueScene("Air", rawName)
+                else
+                    QueueScene("Elem", rawName)
+                end
             end
             lastTargetType = nil
         end
 
     elseif event == "MERCHANT_SHOW" then
         savedAmmo = GetInventoryItemCount("player", 0) or 0
+
     elseif event == "MERCHANT_CLOSED" then
         local currentAmmo = GetInventoryItemCount("player", 0) or 0
         if currentAmmo > savedAmmo then
+            savedAmmo = currentAmmo
+            if currentAmmo >= 150 then lowAmmoWarned = false end
+            QueueScene("AmmoBuy")
+        end
+
+    elseif event == "BAG_UPDATE" then
+        local currentAmmo = GetInventoryItemCount("player", 0) or 0
+        if currentAmmo > 0 and currentAmmo < 100 and not lowAmmoWarned then
+            lowAmmoWarned = true
+            QueueScene("AmmoLow")
+        end
+
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        local slotID, hasItem = ...
+        if slotID == 18 and hasItem then
+            QueueScene("NewBow")
+        end
+    end
+end)
