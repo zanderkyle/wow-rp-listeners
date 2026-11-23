@@ -1,0 +1,6 @@
+## Interface: 120105, 11509, 50504, 38002, 20506, 16001
+## Title: Juju RP Listener
+## Notes: Triggers SpeakEasy RP scenes for Juju Shabàdu
+## Dependencies: SpeakEasy
+
+JujuRP.lua
