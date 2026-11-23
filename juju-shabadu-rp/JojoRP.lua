@@ -1,9 +1,15 @@
 -- ==========================================
--- JOJO RP SETTINGS (Edit these two anytime!)
+-- JOJO RP SETTINGS (Edit these anytime!)
 -- ==========================================
-local CHANCE = 30        -- Percentage chance (1-100) per kill/action
-local COOLDOWN = 25      -- Minimum seconds between any two Jojo RP lines
+local TARGET_CHARACTER = "Jojo" -- Only runs on this character (leave "" to run on any character)
+local CHANCE = 30               -- Percentage chance (1-100) per kill/action
+local COOLDOWN = 25             -- Minimum seconds between any two Jojo RP lines
 -- ==========================================
+
+-- Stop loading the addon if we aren't logged into the target character
+if TARGET_CHARACTER ~= "" and UnitName("player") ~= TARGET_CHARACTER then
+    return
+end
 
 local savedAmmo = 0
 local lowAmmoWarned = false
@@ -181,43 +187,4 @@ f:SetScript("OnEvent", function(self, event, ...)
         local rawName = (UnitExists("target") and UnitName("target")) or lastTargetName or ""
         if cType and cType ~= "Beast" then
             if cType == "Demon" or IsDemonicName(rawName) then
-                QueueScene("Demon", rawName)
-            elseif cType == "Humanoid" then
-                QueueScene("Hum", rawName)
-            elseif cType == "Undead" then
-                QueueScene("Undead", rawName)
-            elseif cType == "Mechanical" then
-                QueueScene("Mech", rawName)
-            elseif cType == "Elemental" then
-                local name = string.lower(rawName)
-                if string.find(name, "earth") or string.find(name, "rock") or string.find(name, "stone") or string.find(name, "crag") or string.find(name, "rumbler") or string.find(name, "boulder") then QueueScene("Earth", rawName)
-                elseif string.find(name, "water") or string.find(name, "tide") or string.find(name, "surf") or string.find(name, "stream") or string.find(name, "wave") or string.find(name, "sea") then QueueScene("Water", rawName)
-                elseif string.find(name, "fire") or string.find(name, "flame") or string.find(name, "ember") or string.find(name, "scorch") or string.find(name, "blaze") or string.find(name, "magma") or string.find(name, "lava") then QueueScene("Fire", rawName)
-                elseif string.find(name, "air") or string.find(name, "wind") or string.find(name, "dust") or string.find(name, "gale") or string.find(name, "cyclone") or string.find(name, "tempest") or string.find(name, "whirlwind") then QueueScene("Air", rawName)
-                else QueueScene("Elem", rawName) end
-            end
-            lastTargetType = nil
-        end
-
-    elseif event == "MERCHANT_SHOW" then
-        savedAmmo = GetInventoryItemCount("player", 0) or 0
-    elseif event == "MERCHANT_CLOSED" then
-        local currentAmmo = GetInventoryItemCount("player", 0) or 0
-        if currentAmmo > savedAmmo then
-            savedAmmo = currentAmmo
-            if currentAmmo >= 150 then lowAmmoWarned = false end
-            QueueScene("AmmoBuy")
-        end
-    elseif event == "BAG_UPDATE" then
-        local currentAmmo = GetInventoryItemCount("player", 0) or 0
-        if currentAmmo > 0 and currentAmmo < 100 and not lowAmmoWarned then
-            lowAmmoWarned = true
-            QueueScene("AmmoLow")
-        end
-    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-        local slotID, hasItem = ...
-        if slotID == 18 and hasItem then
-            QueueScene("NewBow")
-        end
-    end
-end)
+                QueueScene("Demon
