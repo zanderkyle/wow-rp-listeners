@@ -11,12 +11,19 @@ local CHANCE = 30               -- Percentage chance (1-100) per kill/action
 local COOLDOWN = 25             -- Minimum seconds between any two Juju RP lines
 -- ==========================================
 
-local playerName = UnitName("player")
-local charPrefix = CHARACTER_PREFIXES[playerName]
+local charPrefix = nil
+local isEnabled = false
 
--- Stop loading the addon if we aren't logged into a configured character
-if not charPrefix or charPrefix == "" then
-    return
+-- Matches exact name OR starts with "Juju Shab" (avoids UTF-8 accent encoding issues)
+local function ResolveCharacterPrefix(name)
+    if not name then return nil end
+    if CHARACTER_PREFIXES[name] then
+        return CHARACTER_PREFIXES[name]
+    end
+    if string.find(name, "^Juju Shab") then
+        return "ju"
+    end
+    return nil
 end
 
 local savedAmmo = 0
@@ -75,7 +82,7 @@ end
 local function PlaySceneFromSpeakEasyDB(slug, cachedName)
     if not (SpeakEasyDB and SpeakEasyDB.scenes) then return end
 
-    -- Look for prefixed scene first (e.g., "jjskinsay"), fall back to unprefixed ("skinsay")
+    -- Look for prefixed scene first (e.g., "juskinsay"), fall back to unprefixed ("skinsay")
     local prefixedSlug = string.lower(charPrefix) .. slug
     local targetScene = FindSceneBySlug(prefixedSlug) or FindSceneBySlug(slug)
 
@@ -156,6 +163,7 @@ if LootFrameCloseButton then
 end
 
 local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("PLAYER_TARGET_CHANGED")
 f:RegisterEvent("LOOT_CLOSED")
 f:RegisterEvent("UNIT_SPELLCAST_START")
@@ -166,6 +174,20 @@ f:RegisterEvent("BAG_UPDATE")
 f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, ...)
+    if event == "PLAYER_LOGIN" then
+        local name = UnitName("player")
+        charPrefix = ResolveCharacterPrefix(name)
+        isEnabled = (charPrefix ~= nil and charPrefix ~= "")
+        if isEnabled then
+            print("|cff00ff00[JujuRP]|r Active for " .. tostring(name) .. " (prefix: " .. charPrefix .. ")")
+        else
+            print("|cffff5555[JujuRP]|r Inactive for " .. tostring(name))
+        end
+        return
+    end
+
+    if not isEnabled then return end
+
     if event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and not UnitIsFriend("player", "target") then
             lastTargetType = UnitCreatureType("target")
@@ -224,20 +246,3 @@ f:SetScript("OnEvent", function(self, event, ...)
     elseif event == "MERCHANT_CLOSED" then
         local currentAmmo = GetInventoryItemCount("player", 0) or 0
         if currentAmmo > savedAmmo then
-            savedAmmo = currentAmmo
-            if currentAmmo >= 150 then lowAmmoWarned = false end
-            QueueScene("AmmoBuy")
-        end
-    elseif event == "BAG_UPDATE" then
-        local currentAmmo = GetInventoryItemCount("player", 0) or 0
-        if currentAmmo > 0 and currentAmmo < 100 and not lowAmmoWarned then
-            lowAmmoWarned = true
-            QueueScene("AmmoLow")
-        end
-    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-        local slotID, hasItem = ...
-        if slotID == 18 and hasItem then
-            QueueScene("NewBow")
-        end
-    end
-end)
