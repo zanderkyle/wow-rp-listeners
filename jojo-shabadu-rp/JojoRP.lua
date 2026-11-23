@@ -1,9 +1,15 @@
 -- ==========================================
--- JOJO RP SETTINGS (Edit these two anytime!)
+-- JOJO RP SETTINGS (Edit these anytime!)
 -- ==========================================
-local CHANCE = 30        -- Percentage chance (1-100) per kill/action
-local COOLDOWN = 25      -- Minimum seconds between any two Jojo RP lines
+local TARGET_CHARACTER = "Jojo Shabàdu" -- Only runs on this character (leave "" to run on any character)
+local CHANCE = 30               -- Percentage chance (1-100) per kill/action
+local COOLDOWN = 25             -- Minimum seconds between any two Jojo RP lines
 -- ==========================================
+
+-- Stop loading the addon if we aren't logged into the target character
+if TARGET_CHARACTER ~= "" and UnitName("player") ~= TARGET_CHARACTER then
+    return
+end
 
 local savedAmmo = 0
 local lowAmmoWarned = false
