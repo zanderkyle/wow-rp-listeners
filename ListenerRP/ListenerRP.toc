@@ -1,0 +1,6 @@
+## Interface: 120105, 11509, 50504, 38002, 20506, 16001
+## Title: Listener RP
+## Notes: Triggers SpeakEasy RP scenes based on character name
+## Dependencies: SpeakEasy
+
+ListenerRP.lua
