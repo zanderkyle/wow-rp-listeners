@@ -46,6 +46,7 @@ local savedAmmo = 0
 local lowAmmoWarned = false
 local lastTargetType = nil
 local lastTargetName = nil
+local killedBeastName = nil  -- name of the last beast the player killed; nil = found beast
 local pendingSlug = nil
 local pendingMobName = nil
 local lastFiredTime = 0
@@ -209,7 +210,14 @@ f:SetScript("OnEvent", function(self, event, ...)
             local spellInfo = C_Spell and C_Spell.GetSpellInfo(spellID)
             local spellName = spellInfo and spellInfo.name or (GetSpellInfo and GetSpellInfo(spellID))
             if spellID == 8613 or spellName == "Skinning" then
-                QueueScene("Skin", lastTargetName)
+                local targetName = UnitName("target") or lastTargetName
+                local isOwnKill = (killedBeastName ~= nil and killedBeastName == targetName)
+                killedBeastName = nil
+                if isOwnKill then
+                    QueueScene("Skin", lastTargetName)
+                else
+                    QueueScene("SkinFound", lastTargetName)
+                end
                 lastTargetType = nil
             end
         end
@@ -220,6 +228,7 @@ f:SetScript("OnEvent", function(self, event, ...)
         if cType == "Beast" then
             if not CanSkinTarget() then
                 QueueScene("NoSkin", mobName)
+                killedBeastName = nil  -- won't be skinning this one
             end
             lastTargetType = nil
         end
@@ -227,7 +236,12 @@ f:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
         local rawName = (UnitExists("target") and UnitName("target")) or lastTargetName or ""
-        if cType and cType ~= "Beast" then
+        if cType == "Beast" then
+            -- Player killed this beast; remember its name so skinning knows it was an own kill
+            killedBeastName = rawName
+            lastTargetType = nil
+        elseif cType and cType ~= "Beast" then
+            killedBeastName = nil  -- killed a non-beast, clear any stale beast tracking
             if cType == "Demon" or IsDemonicName(rawName) then
                 QueueScene("Demon", rawName)
             elseif cType == "Humanoid" then
