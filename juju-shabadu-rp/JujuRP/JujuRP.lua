@@ -3,19 +3,22 @@
 -- ==========================================
 -- Map each character name to a 2-letter prefix (characters not listed won't run)
 local CHARACTER_PREFIXES = {
-    ["Juju"] = "ju",
+    ["Juju Shabàdu"] = "ju",
     -- ["AltCharacterName"] = "al",
 }
 
-local CHANCE = 30               -- Percentage chance (1-100) per kill/action
+local CHANCE = 100               -- Percentage chance (1-100) per kill/action
 local COOLDOWN = 25             -- Minimum seconds between any two Juju RP lines
 -- ==========================================
 
 local function ResolveCharacterPrefix(name)
     if not name or name == "" or name == "Unknown" then return nil end
-    local lowerName = string.lower(name)
+    -- Direct lookup (works when the full name is available)
+    if CHARACTER_PREFIXES[name] then return CHARACTER_PREFIXES[name] end
+    -- UnitName returns only the first name at load time (e.g. "Juju" instead of
+    -- "Juju Shabàdu"), so also check whether any key starts with what was returned
     for charName, prefix in pairs(CHARACTER_PREFIXES) do
-        if string.lower(charName) == lowerName then
+        if string.sub(charName, 1, #name) == name then
             return prefix
         end
     end
@@ -24,11 +27,10 @@ end
 
 local charPrefix = ResolveCharacterPrefix(UnitName("player"))
 local isEnabled = (charPrefix ~= nil and charPrefix ~= "")
-
 local savedAmmo = 0
 local lowAmmoWarned = false
-local lastTargetType = UnitExists("target") and UnitCreatureType("target") or nil
-local lastTargetName = UnitExists("target") and UnitName("target") or nil
+local lastTargetType = nil
+local lastTargetName = nil
 local pendingSlug = nil
 local pendingMobName = nil
 local lastFiredTime = 0
@@ -77,12 +79,13 @@ local function FindSceneBySlug(targetSlug)
 end
 
 local function PlaySceneFromSpeakEasyDB(slug, cachedName)
-    if not (SpeakEasyDB and SpeakEasyDB.scenes) then return end
+    if not (SpeakEasyDB and SpeakEasyDB.scenes) then print("[JujuRP] play: no SpeakEasyDB") return end
 
     local prefixedSlug = string.lower(charPrefix) .. slug
     local targetScene = FindSceneBySlug(prefixedSlug) or FindSceneBySlug(slug)
+    print("[JujuRP] play: looking for '" .. prefixedSlug .. "' found=" .. tostring(targetScene ~= nil))
 
-    if not targetScene or targetScene.enabled == false or not targetScene.lines then return end
+    if not targetScene or targetScene.enabled == false or not targetScene.lines then print("[JujuRP] play: scene missing/disabled/no lines") return end
 
     local sceneCD = targetScene.cooldown or 0
     if sceneCooldowns[slug] and (GetTime() - sceneCooldowns[slug]) < sceneCD then
@@ -127,12 +130,13 @@ local function PlaySceneFromSpeakEasyDB(slug, cachedName)
 end
 
 local function QueueScene(baseTag, mobName)
-    if (GetTime() - lastFiredTime) < COOLDOWN then return end
-    if TrueRandom(100) > CHANCE then return end
+    if (GetTime() - lastFiredTime) < COOLDOWN then print("[JujuRP] queue: blocked by cooldown") return end
+    if TrueRandom(100) > CHANCE then print("[JujuRP] queue: blocked by chance") return end
 
     local suffix = (TrueRandom(2) == 1) and "say" or "emote"
     pendingSlug = string.lower(baseTag) .. suffix
     pendingMobName = mobName or lastTargetName
+    print("[JujuRP] queue: slug=" .. pendingSlug)
 end
 
 local function FlushPending()
@@ -141,6 +145,7 @@ local function FlushPending()
         local mobName = pendingMobName
         pendingSlug = nil
         pendingMobName = nil
+        print("[JujuRP] flush: slug=" .. tostring(slug))
         PlaySceneFromSpeakEasyDB(slug, mobName)
     end
 end
@@ -171,9 +176,9 @@ f:SetScript("OnEvent", function(self, event, ...)
         local name = UnitName("player")
         charPrefix = ResolveCharacterPrefix(name)
         isEnabled = (charPrefix ~= nil and charPrefix ~= "")
+        print("[JujuRP] login: namelen=" .. #tostring(name) .. " enabled=" .. tostring(isEnabled))
         return
     end
-
 
     if not isEnabled then return end
 
@@ -207,6 +212,7 @@ f:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
         local rawName = (UnitExists("target") and UnitName("target")) or lastTargetName or ""
+        print("[JujuRP] regen: cType=" .. tostring(cType))
         if cType and cType ~= "Beast" then
             if cType == "Demon" or IsDemonicName(rawName) then
                 QueueScene("Demon", rawName)
