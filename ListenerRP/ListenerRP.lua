@@ -15,6 +15,13 @@ local CHARACTER_PREFIXES = {
 
 local CHANCE = 30               -- Percentage chance (1-100) per kill/action
 local COOLDOWN = 25             -- Minimum seconds between any two RP lines
+
+-- If any looted item name contains one of these words, skinning scenes are suppressed.
+local LOOT_SUPPRESS_KEYWORDS = {
+    "ruined",
+    -- "poor",
+    -- "tattered",
+}
 -- ==========================================
 
 -- UnitName("player") returns firstName, surname as two separate values in this client.
@@ -47,6 +54,7 @@ local lowAmmoWarned = false
 local lastTargetType = nil
 local lastTargetName = nil
 local killedBeastName = nil  -- name of the last beast the player killed; nil = found beast
+local lootHasRuined = false  -- true if the current loot window contains any "ruined" item
 local pendingSlug = nil
 local pendingMobName = nil
 local lastFiredTime = 0
@@ -181,6 +189,7 @@ local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("PLAYER_TARGET_CHANGED")
+f:RegisterEvent("LOOT_OPENED")
 f:RegisterEvent("LOOT_CLOSED")
 f:RegisterEvent("UNIT_SPELLCAST_START")
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -198,7 +207,23 @@ f:SetScript("OnEvent", function(self, event, ...)
 
     if not isEnabled then return end
 
-    if event == "PLAYER_TARGET_CHANGED" then
+    if event == "LOOT_OPENED" then
+        lootHasRuined = false
+        local numSlots = GetNumLootItems and GetNumLootItems() or 0
+        for i = 1, numSlots do
+            local link = GetLootSlotLink and GetLootSlotLink(i)
+            if link then
+                local lowerLink = string.lower(link)
+                for _, keyword in ipairs(LOOT_SUPPRESS_KEYWORDS) do
+                    if string.find(lowerLink, keyword) then
+                        lootHasRuined = true
+                        break
+                    end
+                end
+            end
+        end
+
+    elseif event == "PLAYER_TARGET_CHANGED" then
         if UnitExists("target") and not UnitIsFriend("player", "target") then
             lastTargetType = UnitCreatureType("target")
             lastTargetName = UnitName("target")
@@ -213,10 +238,12 @@ f:SetScript("OnEvent", function(self, event, ...)
                 local targetName = UnitName("target") or lastTargetName
                 local isOwnKill = (killedBeastName ~= nil and killedBeastName == targetName)
                 killedBeastName = nil
-                if isOwnKill then
-                    QueueScene("Skin", lastTargetName)
-                else
-                    QueueScene("SkinFound", lastTargetName)
+                if not lootHasRuined then
+                    if isOwnKill then
+                        QueueScene("Skin", lastTargetName)
+                    else
+                        QueueScene("SkinFound", lastTargetName)
+                    end
                 end
                 lastTargetType = nil
             end
