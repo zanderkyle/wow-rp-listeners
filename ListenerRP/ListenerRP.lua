@@ -1,14 +1,15 @@
 -- ==========================================
 -- LISTENER RP SETTINGS (Edit these anytime!)
 -- ==========================================
--- Map each character's first name to a scene table prefix.
--- Use "" for no prefix (scenes use plain names like "Humsay", "Humemote").
--- Use a short string like "ju" for prefixed names like "juHumsay", "juHumemote".
--- Characters not listed here will not trigger any scenes.
+-- The addon will ONLY fire for characters listed here. Everyone else is ignored.
+--
+-- The main character uses "" so their SpeakEasy scenes need no prefix (plain names
+-- like "Humsay", "Humemote"). Alts use a short unique prefix so their scenes are
+-- kept separate (e.g. "ju" turns "Humsay" into "juHumsay").
 local CHARACTER_PREFIXES = {
-    ["Juju"] = "ju",
-    ["Jojo"] = "",
-    -- ["YourCharacter"] = "",
+    ["Jojo"] = "",    -- main character (plain scene names)
+    ["Juju"] = "ju",  -- alt
+    -- ["AltName"] = "xx",
 }
 
 local CHANCE = 30               -- Percentage chance (1-100) per kill/action
