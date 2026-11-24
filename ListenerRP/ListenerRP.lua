@@ -3,13 +3,14 @@
 -- ==========================================
 -- The addon will ONLY fire for characters listed here. Everyone else is ignored.
 --
--- The main character uses "" so their SpeakEasy scenes need no prefix (plain names
--- like "Humsay", "Humemote"). Alts use a short unique prefix so their scenes are
--- kept separate (e.g. "ju" turns "Humsay" into "juHumsay").
+-- Keys are full character names ("First Surname"). The main character uses ""
+-- so their SpeakEasy scenes need no prefix (plain names like "Humsay", "Humemote").
+-- Alts use a short unique prefix so their scenes are kept separate
+-- (e.g. "ju" turns "Humsay" into "juHumsay").
 local CHARACTER_PREFIXES = {
-    ["Jojo"] = "",    -- main character (plain scene names)
-    ["Juju"] = "ju",  -- alt
-    -- ["AltName"] = "xx",
+    ["Jojo Shabàdu"] = "",    -- main character (plain scene names)
+    ["Juju Shabàdu"] = "ju",  -- alt
+    -- ["Alt Surname"] = "xx",
 }
 
 local CHANCE = 30               -- Percentage chance (1-100) per kill/action
@@ -17,12 +18,28 @@ local COOLDOWN = 25             -- Minimum seconds between any two RP lines
 -- ==========================================
 
 -- UnitName("player") returns firstName, surname as two separate values in this client.
--- Assigning to a single variable silently discards the surname, leaving only the first name.
-local firstName = UnitName("player")
+-- We build the full name and try an exact lookup first. If the encoding of accented
+-- characters in the key doesn't match what the game returns, we fall back to
+-- matching by first name only (limitation: can't distinguish two characters who
+-- share a first name, but that case is rare and hard to solve at load time).
+local function ResolvePrefix()
+    local firstName, surname = UnitName("player")
+    if not firstName then return nil end
+    local fullName = (surname and surname ~= "") and (firstName .. " " .. surname) or firstName
+    if CHARACTER_PREFIXES[fullName] ~= nil then
+        return CHARACTER_PREFIXES[fullName]
+    end
+    for charName, prefix in pairs(CHARACTER_PREFIXES) do
+        if string.sub(charName, 1, #firstName) == firstName then
+            return prefix
+        end
+    end
+    return nil
+end
 
 -- nil means this character is not in the table and the addon will not run.
 -- "" is a valid prefix meaning scenes use plain unprefixed names.
-local charPrefix = CHARACTER_PREFIXES[firstName]
+local charPrefix = ResolvePrefix()
 local isEnabled = (charPrefix ~= nil)
 
 local savedAmmo = 0
@@ -173,8 +190,7 @@ f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
-        firstName = UnitName("player")
-        charPrefix = CHARACTER_PREFIXES[firstName]
+        charPrefix = ResolvePrefix()
         isEnabled = (charPrefix ~= nil)
         return
     end
