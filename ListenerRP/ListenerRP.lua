@@ -25,23 +25,14 @@ local LOOT_SUPPRESS_KEYWORDS = {
 -- ==========================================
 
 -- UnitName("player") returns firstName, surname as two separate values in this client.
--- We build the full name and try an exact lookup first. If the encoding of accented
--- characters in the key doesn't match what the game returns, we fall back to
--- matching by first name only (limitation: can't distinguish two characters who
--- share a first name, but that case is rare and hard to solve at load time).
+-- We build the full name and do an exact lookup against CHARACTER_PREFIXES.
+-- The key encoding in this file must match what the game returns; in practice
+-- WoW loads .lua files and returns unit names in the same encoding, so they match.
 local function ResolvePrefix()
     local firstName, surname = UnitName("player")
     if not firstName then return nil end
     local fullName = (surname and surname ~= "") and (firstName .. " " .. surname) or firstName
-    if CHARACTER_PREFIXES[fullName] ~= nil then
-        return CHARACTER_PREFIXES[fullName]
-    end
-    for charName, prefix in pairs(CHARACTER_PREFIXES) do
-        if string.sub(charName, 1, #firstName) == firstName then
-            return prefix
-        end
-    end
-    return nil
+    return CHARACTER_PREFIXES[fullName]
 end
 
 -- nil means this character is not in the table and the addon will not run.
