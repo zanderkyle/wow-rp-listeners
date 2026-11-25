@@ -10,6 +10,8 @@
 local CHARACTER_PREFIXES = {
     ["Jojo Shabàdu"] = "",    -- main character (plain scene names)
     ["Juju Shabàdu"] = "ju",  -- alt
+    ["Grizz Goldbrick"] = "gz",  -- alt
+    ["Gromm Goldbrick"] = "gm",  -- alt
     -- ["Alt Surname"] = "xx",
 }
 
