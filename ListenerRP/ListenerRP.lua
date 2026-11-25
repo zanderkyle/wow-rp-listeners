@@ -53,8 +53,9 @@ local savedAmmo = 0
 local lowAmmoWarned = false
 local lastTargetType = nil
 local lastTargetName = nil
-local killedBeastName = nil  -- name of the last beast the player killed; nil = found beast
-local lootHasRuined = false  -- true if the current loot window contains any "ruined" item
+local killedBeastName = nil   -- name of the last beast the player killed; nil = found beast
+local pendingSkinType = nil   -- "Skin" or "SkinFound"; set when skinning starts, queued after skinning loot closes
+local lootHasRuined = false   -- true if the current loot window contains a suppress keyword
 local pendingSlug = nil
 local pendingMobName = nil
 local lastFiredTime = 0
@@ -238,26 +239,30 @@ f:SetScript("OnEvent", function(self, event, ...)
                 local targetName = UnitName("target") or lastTargetName
                 local isOwnKill = (killedBeastName ~= nil and killedBeastName == targetName)
                 killedBeastName = nil
-                if not lootHasRuined then
-                    if isOwnKill then
-                        QueueScene("Skin", lastTargetName)
-                    else
-                        QueueScene("SkinFound", lastTargetName)
-                    end
-                end
+                -- Don't queue yet — wait for the skinning loot window to close so we
+                -- can check whether the results contain any suppressed keywords.
+                pendingSkinType = isOwnKill and "Skin" or "SkinFound"
                 lastTargetType = nil
             end
         end
 
     elseif event == "LOOT_CLOSED" then
-        local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
-        local mobName = (UnitExists("target") and UnitName("target")) or lastTargetName
-        if cType == "Beast" then
-            if not CanSkinTarget() then
-                QueueScene("NoSkin", mobName)
-                killedBeastName = nil  -- won't be skinning this one
+        if pendingSkinType then
+            -- The skinning loot window just closed; now we know the results.
+            if not lootHasRuined then
+                QueueScene(pendingSkinType, lastTargetName)
             end
-            lastTargetType = nil
+            pendingSkinType = nil
+        else
+            local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
+            local mobName = (UnitExists("target") and UnitName("target")) or lastTargetName
+            if cType == "Beast" then
+                if not CanSkinTarget() then
+                    QueueScene("NoSkin", mobName)
+                    killedBeastName = nil  -- won't be skinning this one
+                end
+                lastTargetType = nil
+            end
         end
 
     elseif event == "PLAYER_REGEN_ENABLED" then
