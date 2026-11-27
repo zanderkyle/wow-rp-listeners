@@ -3,17 +3,18 @@
 -- ==========================================
 -- The addon will ONLY fire for characters listed here. Everyone else is ignored.
 --
--- prefix  : string added to every SpeakEasy scene name. Use "" for plain names
---           ("Humsay"), or a short tag for namespaced names ("ju" -> "juHumsay").
--- skinning: true if the character has the Skinning profession. Skinning characters
---           get Skin / SkinFound / NoSkin scenes. Non-skinning characters skip all
---           of that and get a plain Beast scene queued directly after the kill.
+-- prefix   : string added to every SpeakEasy scene name. Use "" for plain names
+--            ("Humsay"), or a short tag for namespaced names ("ju" -> "juHumsay").
+-- skinning : true if the character has Skinning. Gets Skin/SkinFound/NoSkin scenes.
+--            Non-skinning characters get a plain Beast scene after a beast kill.
+-- mining   : true if the character has Mining. Gets Mine scenes after mining a node.
+-- herbalism: true if the character has Herbalism. Gets Herb scenes after picking.
 local CHARACTERS = {
-    ["Jojo Shabàdu"]    = { prefix = "",    skinning = true  },
-    ["Juju Shabàdu"]    = { prefix = "ju",  skinning = true  },
-    ["Grizz Goldbrick"] = { prefix = "gz",  skinning = true },
-    ["Gromm Goldbrick"] = { prefix = "gm",  skinning = false },
-    -- ["Alt Surname"]  = { prefix = "xx",  skinning = false },
+    ["Jojo Shabàdu"]    = { prefix = "",    skinning = true,  mining = false, herbalism = false },
+    ["Juju Shabàdu"]    = { prefix = "ju",  skinning = true,  mining = false, herbalism = false },
+    ["Grizz Goldbrick"] = { prefix = "gz",  skinning = true,  mining = false, herbalism = false },
+    ["Gromm Goldbrick"] = { prefix = "gm",  skinning = false, mining = false, herbalism = false },
+    -- ["Alt Surname"]  = { prefix = "xx",  skinning = false, mining = false, herbalism = false },
 }
 
 local CHANCE = 30               -- Percentage chance (1-100) per kill/action
@@ -38,18 +39,21 @@ local function ResolveCharacter()
     return CHARACTERS[fullName]
 end
 
-local charConfig   = ResolveCharacter()
-local charPrefix   = charConfig and charConfig.prefix
-local charSkinning = charConfig and charConfig.skinning or false
-local isEnabled    = (charConfig ~= nil)
+local charConfig    = ResolveCharacter()
+local charPrefix    = charConfig and charConfig.prefix
+local charSkinning  = charConfig and charConfig.skinning  or false
+local charMining    = charConfig and charConfig.mining    or false
+local charHerbalism = charConfig and charConfig.herbalism or false
+local isEnabled     = (charConfig ~= nil)
 
 local savedAmmo = 0
 local lowAmmoWarned = false
 local lastTargetType = nil
 local lastTargetName = nil
-local killedBeastName = nil   -- name of the last beast the player killed; nil = found beast
-local pendingSkinType = nil   -- "Skin" or "SkinFound"; set when skinning starts, queued after skinning loot closes
-local lootHasRuined = false   -- true if the current loot window contains a suppress keyword
+local killedBeastName  = nil   -- name of the last beast the player killed; nil = found beast
+local pendingGatherTag  = nil   -- gather scene to queue once the loot window closes ("Skin", "SkinFound", "Mine", "Herb")
+local pendingGatherName = nil   -- node/target name captured at cast time for gather scenes
+local lootHasRuined     = false -- true if the current loot window contains a suppress keyword (skinning only)
 local pendingSlug = nil
 local pendingMobName = nil
 local lastFiredTime = 0
@@ -195,10 +199,12 @@ f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
-        charConfig   = ResolveCharacter()
-        charPrefix   = charConfig and charConfig.prefix
-        charSkinning = charConfig and charConfig.skinning or false
-        isEnabled    = (charConfig ~= nil)
+        charConfig    = ResolveCharacter()
+        charPrefix    = charConfig and charConfig.prefix
+        charSkinning  = charConfig and charConfig.skinning  or false
+        charMining    = charConfig and charConfig.mining    or false
+        charHerbalism = charConfig and charConfig.herbalism or false
+        isEnabled     = (charConfig ~= nil)
         return
     end
 
@@ -239,18 +245,28 @@ f:SetScript("OnEvent", function(self, event, ...)
                 killedBeastName = nil
                 -- Don't queue yet — wait for the skinning loot window to close so we
                 -- can check whether the results contain any suppressed keywords.
-                pendingSkinType = isOwnKill and "Skin" or "SkinFound"
-                lastTargetType = nil
+                pendingGatherTag  = isOwnKill and "Skin" or "SkinFound"
+                pendingGatherName = targetName
+                lastTargetType    = nil
+            elseif charMining and spellName == "Mining" then
+                pendingGatherTag  = "Mine"
+                pendingGatherName = UnitName("target")
+            elseif charHerbalism and spellName == "Herbalism" then
+                pendingGatherTag  = "Herb"
+                pendingGatherName = UnitName("target")
             end
         end
 
     elseif event == "LOOT_CLOSED" then
-        if pendingSkinType then
-            -- The skinning loot window just closed; now we know the results.
-            if not lootHasRuined then
-                QueueScene(pendingSkinType, lastTargetName)
+        if pendingGatherTag then
+            -- For skinning, suppress if the results contained a keyword (e.g. "ruined").
+            -- Mining and herbalism always fire since there's no quality filter yet.
+            local isSkin = (pendingGatherTag == "Skin" or pendingGatherTag == "SkinFound")
+            if not isSkin or not lootHasRuined then
+                QueueScene(pendingGatherTag, pendingGatherName)
             end
-            pendingSkinType = nil
+            pendingGatherTag  = nil
+            pendingGatherName = nil
         elseif charSkinning then
             local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
             local mobName = (UnitExists("target") and UnitName("target")) or lastTargetName
