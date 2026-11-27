@@ -3,16 +3,17 @@
 -- ==========================================
 -- The addon will ONLY fire for characters listed here. Everyone else is ignored.
 --
--- Keys are full character names ("First Surname"). The main character uses ""
--- so their SpeakEasy scenes need no prefix (plain names like "Humsay", "Humemote").
--- Alts use a short unique prefix so their scenes are kept separate
--- (e.g. "ju" turns "Humsay" into "juHumsay").
-local CHARACTER_PREFIXES = {
-    ["Jojo Shabàdu"] = "",    -- main character (plain scene names)
-    ["Juju Shabàdu"] = "ju",  -- alt
-    ["Grizz Goldbrick"] = "gz",  -- alt
-    ["Gromm Goldbrick"] = "gm",  -- alt
-    -- ["Alt Surname"] = "xx",
+-- prefix  : string added to every SpeakEasy scene name. Use "" for plain names
+--           ("Humsay"), or a short tag for namespaced names ("ju" -> "juHumsay").
+-- skinning: true if the character has the Skinning profession. Skinning characters
+--           get Skin / SkinFound / NoSkin scenes. Non-skinning characters skip all
+--           of that and get a plain Beast scene queued directly after the kill.
+local CHARACTERS = {
+    ["Jojo Shabàdu"]    = { prefix = "",    skinning = true  },
+    ["Juju Shabàdu"]    = { prefix = "ju",  skinning = true  },
+    ["Grizz Goldbrick"] = { prefix = "gz",  skinning = true },
+    ["Gromm Goldbrick"] = { prefix = "gm",  skinning = false },
+    -- ["Alt Surname"]  = { prefix = "xx",  skinning = false },
 }
 
 local CHANCE = 30               -- Percentage chance (1-100) per kill/action
@@ -27,20 +28,20 @@ local LOOT_SUPPRESS_KEYWORDS = {
 -- ==========================================
 
 -- UnitName("player") returns firstName, surname as two separate values in this client.
--- We build the full name and do an exact lookup against CHARACTER_PREFIXES.
+-- We build the full name and do an exact lookup against CHARACTERS.
 -- The key encoding in this file must match what the game returns; in practice
 -- WoW loads .lua files and returns unit names in the same encoding, so they match.
-local function ResolvePrefix()
+local function ResolveCharacter()
     local firstName, surname = UnitName("player")
     if not firstName then return nil end
     local fullName = (surname and surname ~= "") and (firstName .. " " .. surname) or firstName
-    return CHARACTER_PREFIXES[fullName]
+    return CHARACTERS[fullName]
 end
 
--- nil means this character is not in the table and the addon will not run.
--- "" is a valid prefix meaning scenes use plain unprefixed names.
-local charPrefix = ResolvePrefix()
-local isEnabled = (charPrefix ~= nil)
+local charConfig   = ResolveCharacter()
+local charPrefix   = charConfig and charConfig.prefix
+local charSkinning = charConfig and charConfig.skinning or false
+local isEnabled    = (charConfig ~= nil)
 
 local savedAmmo = 0
 local lowAmmoWarned = false
@@ -194,8 +195,10 @@ f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
-        charPrefix = ResolvePrefix()
-        isEnabled = (charPrefix ~= nil)
+        charConfig   = ResolveCharacter()
+        charPrefix   = charConfig and charConfig.prefix
+        charSkinning = charConfig and charConfig.skinning or false
+        isEnabled    = (charConfig ~= nil)
         return
     end
 
@@ -203,15 +206,17 @@ f:SetScript("OnEvent", function(self, event, ...)
 
     if event == "LOOT_OPENED" then
         lootHasRuined = false
-        local numSlots = GetNumLootItems and GetNumLootItems() or 0
-        for i = 1, numSlots do
-            local link = GetLootSlotLink and GetLootSlotLink(i)
-            if link then
-                local lowerLink = string.lower(link)
-                for _, keyword in ipairs(LOOT_SUPPRESS_KEYWORDS) do
-                    if string.find(lowerLink, keyword) then
-                        lootHasRuined = true
-                        break
+        if charSkinning then
+            local numSlots = GetNumLootItems and GetNumLootItems() or 0
+            for i = 1, numSlots do
+                local link = GetLootSlotLink and GetLootSlotLink(i)
+                if link then
+                    local lowerLink = string.lower(link)
+                    for _, keyword in ipairs(LOOT_SUPPRESS_KEYWORDS) do
+                        if string.find(lowerLink, keyword) then
+                            lootHasRuined = true
+                            break
+                        end
                     end
                 end
             end
@@ -228,7 +233,7 @@ f:SetScript("OnEvent", function(self, event, ...)
         if unitTarget == "player" and spellID then
             local spellInfo = C_Spell and C_Spell.GetSpellInfo(spellID)
             local spellName = spellInfo and spellInfo.name or (GetSpellInfo and GetSpellInfo(spellID))
-            if spellID == 8613 or spellName == "Skinning" then
+            if charSkinning and (spellID == 8613 or spellName == "Skinning") then
                 local targetName = UnitName("target") or lastTargetName
                 local isOwnKill = (killedBeastName ~= nil and killedBeastName == targetName)
                 killedBeastName = nil
@@ -246,13 +251,13 @@ f:SetScript("OnEvent", function(self, event, ...)
                 QueueScene(pendingSkinType, lastTargetName)
             end
             pendingSkinType = nil
-        else
+        elseif charSkinning then
             local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
             local mobName = (UnitExists("target") and UnitName("target")) or lastTargetName
             if cType == "Beast" then
                 if not CanSkinTarget() then
                     QueueScene("NoSkin", mobName)
-                    killedBeastName = nil  -- won't be skinning this one
+                    killedBeastName = nil
                 end
                 lastTargetType = nil
             end
@@ -262,8 +267,13 @@ f:SetScript("OnEvent", function(self, event, ...)
         local cType = (UnitExists("target") and UnitCreatureType("target")) or lastTargetType
         local rawName = (UnitExists("target") and UnitName("target")) or lastTargetName or ""
         if cType == "Beast" then
-            -- Player killed this beast; remember its name so skinning knows it was an own kill
-            killedBeastName = rawName
+            if charSkinning then
+                -- Remember the kill so the skinning event can confirm it was an own kill
+                killedBeastName = rawName
+            else
+                -- No skinning; treat beast kills like any other creature type
+                QueueScene("Beast", rawName)
+            end
             lastTargetType = nil
         elseif cType and cType ~= "Beast" then
             killedBeastName = nil  -- killed a non-beast, clear any stale beast tracking
