@@ -13,7 +13,7 @@ local CHARACTERS = {
     ["Jojo Shabàdu"]    = { prefix = "",    skinning = true,  mining = false, herbalism = false },
     ["Juju Shabàdu"]    = { prefix = "ju",  skinning = true,  mining = false, herbalism = false },
     ["Grizz Goldbrick"] = { prefix = "gz",  skinning = true,  mining = false, herbalism = false },
-    ["Gromm Goldbrick"] = { prefix = "gm",  skinning = false, mining = false, herbalism = false },
+    ["Gromm Goldbrick"] = { prefix = "gm",  skinning = false, mining = true, herbalism = false },
     -- ["Alt Surname"]  = { prefix = "xx",  skinning = false, mining = false, herbalism = false },
 }
 
